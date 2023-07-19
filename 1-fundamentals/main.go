@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 )
 
 func printTime() {
@@ -113,6 +114,157 @@ func shuffle(nums []int) {
 	rand.Shuffle(len(nums), func(i, j int) { nums[i], nums[j] = nums[j], nums[i] })
 }
 
+type result byte
+
+const (
+	win  result = 'W'
+	draw result = 'D'
+	loss result = 'L'
+)
+
+type team byte
+type match struct {
+	first, second team
+	result        result
+}
+type rating map[team]int
+type tournament []match
+
+func (trn *tournament) calcRating() rating {
+	var r rating = map[team]int{}
+	for _, match := range *trn {
+		if match.result == win {
+			r[match.first] += 3
+			r[match.second] += 0
+		} else if match.result == loss {
+			r[match.second] += 3
+			r[match.first] += 0
+		} else {
+			// draw
+			r[match.first] += 1
+			r[match.second] += 1
+		}
+	}
+	return r
+}
+
+type validator func(s string) bool
+
+func digits(s string) bool {
+	for _, r := range s {
+		if unicode.IsDigit(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func letters(s string) bool {
+	for _, r := range s {
+		if unicode.IsLetter(r) {
+			return true
+		}
+	}
+	return false
+}
+
+func minlen(length int) validator {
+	return func(s string) bool {
+		return utf8.RuneCountInString(s) >= length
+	}
+}
+
+func and(funcs ...validator) validator {
+	var result bool = true
+	return func(s string) bool {
+		for _, val := range funcs {
+			if !val(s) {
+				result = false
+			}
+		}
+		return result
+	}
+}
+
+func or(funcs ...validator) validator {
+	var result bool = false
+	return func(s string) bool {
+		for _, val := range funcs {
+			if val(s) {
+				return true
+			}
+		}
+		return result
+	}
+}
+
+type password struct {
+	value string
+	validator
+}
+
+func (p *password) isValid() bool {
+	return p.validator(p.value)
+}
+
+func validatePassword() {
+	var s string = "hello123"
+	validator := or(and(digits, letters), minlen(10))
+	p := password{s, validator}
+	fmt.Println(p.isValid())
+}
+
+type element interface{}
+type weightFunc func(element) int
+type iterator interface {
+	next() bool
+	val() element
+}
+type intIterator struct {
+	src   []int
+	index int
+}
+
+func (i *intIterator) next() bool {
+	if i.index+1 < len(i.src) {
+		i.index++
+		return true
+	}
+	return false
+}
+
+func (i *intIterator) val() element {
+	if i.index >= 0 && i.index < len(i.src) {
+		return i.src[i.index]
+	}
+	return nil
+}
+
+func newIntIterator(src []int) *intIterator {
+	return &intIterator{src, -1}
+}
+
+func getMax() {
+	nums := []int{1, 2, 4, 5, 3, 7, 2, 3}
+	it := newIntIterator(nums)
+	weight := func(el element) int {
+		return el.(int)
+	}
+	m := max(it, weight)
+	fmt.Println(m)
+}
+
+func max(it iterator, weight weightFunc) element {
+	var maxEl element
+	for it.next() {
+		curr := it.val()
+		if maxEl == nil || weight(curr) > weight(maxEl) {
+			maxEl = curr
+		}
+	}
+	return maxEl
+}
+
 func main() {
 	printTime()
 	euclid()
@@ -125,4 +277,14 @@ func main() {
 	lst := []int{1, 2, 3, 4, 5}
 	shuffle(lst)
 	fmt.Println(lst)
+
+	tour := tournament{
+		{first: 'A', second: 'B', result: win},
+		{first: 'C', second: 'D', result: draw},
+		{first: 'B', second: 'C', result: loss},
+	}
+	tour.calcRating()
+	fmt.Println(tour)
+	validatePassword()
+	getMax()
 }
