@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 	"unicode"
@@ -265,6 +266,227 @@ func max(it iterator, weight weightFunc) element {
 	return maxEl
 }
 
+type label string
+
+type command label
+
+var (
+	eat  = command("eat")
+	take = command("take")
+	talk = command("talk to")
+)
+
+type thing struct {
+	name    label
+	actions map[command]string
+}
+
+func (t thing) supports(action command) bool {
+	_, ok := t.actions[action]
+	return ok
+}
+
+func (t thing) String() string {
+	return string(t.name)
+}
+
+var (
+	apple = thing{"apple", map[command]string{
+		eat:  "mmm, delicious!",
+		take: "you have an apple now",
+	}}
+	bob = thing{"bob", map[command]string{
+		talk: "Bob says hello",
+	}}
+	coin = thing{"coin", map[command]string{
+		take: "you have a coin now",
+	}}
+	mirror = thing{"mirror", map[command]string{
+		take: "you have a mirror now",
+		talk: "mirror does not answer",
+	}}
+	mushroom = thing{"mushroom", map[command]string{
+		eat:  "tastes funny",
+		take: "you have a mushroom now",
+	}}
+)
+
+type step struct {
+	cmd command
+	obj thing
+}
+
+func (s step) isValid() bool {
+	return s.obj.supports(s.cmd)
+}
+
+func (s step) String() string {
+	return fmt.Sprintf("%s %s", s.cmd, s.obj)
+}
+
+type player struct {
+	nEaten    int
+	nDialogs  int
+	inventory []thing
+}
+
+func (p *player) has(obj thing) bool {
+	for _, got := range p.inventory {
+		if got.name == obj.name {
+			return true
+		}
+	}
+	return false
+}
+
+type objectLimitExceededError struct {
+	obj   thing
+	limit int
+}
+
+func (err objectLimitExceededError) Error() string {
+	return fmt.Sprintf("don't be greedy, %d %s is enough", err.limit, err.obj)
+}
+
+type commandLimitExceededError struct {
+	cmd   command
+	limit int
+}
+
+func (err commandLimitExceededError) Error() string {
+	return fmt.Sprintf("%s less", err.cmd)
+}
+
+type notEnoughObjectsError struct {
+	obj thing
+}
+
+func (err notEnoughObjectsError) Error() string {
+	return fmt.Sprintf("be careful with scarce %ss", err.obj)
+}
+
+type invalidStepError struct {
+	st step
+}
+
+func (err invalidStepError) Error() string {
+	return fmt.Sprintf("things like '%s' are impossible", err.st)
+}
+
+type gameOverError struct {
+	nSteps int
+	cause  error
+}
+
+func (err gameOverError) Error() string {
+	return fmt.Sprintf("%s", err.cause)
+}
+
+func (err gameOverError) Unwrap() error {
+	return err.cause
+}
+
+func (p *player) do(cmd command, obj thing) error {
+	switch cmd {
+	case eat:
+		if p.nEaten > 1 {
+			return commandLimitExceededError{cmd, p.nEaten}
+		}
+		p.nEaten++
+	case take:
+		if p.has(obj) {
+			return objectLimitExceededError{obj, 1}
+		}
+		p.inventory = append(p.inventory, obj)
+	case talk:
+		if p.nDialogs > 0 {
+			return commandLimitExceededError{cmd, p.nDialogs}
+		}
+		p.nDialogs++
+	}
+	return nil
+}
+
+func newPlayer() *player {
+	return &player{inventory: []thing{}}
+}
+
+type game struct {
+	player *player
+	things map[label]int
+	nSteps int
+}
+
+func (g *game) has(obj thing) bool {
+	count := g.things[obj.name]
+	return count > 0
+}
+
+func (g *game) execute(st step) error {
+	if !st.isValid() {
+		err := invalidStepError{st}
+		return gameOverError{g.nSteps, err}
+	}
+
+	if st.cmd == take || st.cmd == eat {
+		if !g.has(st.obj) {
+			err := notEnoughObjectsError{st.obj}
+			return gameOverError{g.nSteps, err}
+		}
+		g.things[st.obj.name]--
+	}
+
+	if err := g.player.do(st.cmd, st.obj); err != nil {
+		return gameOverError{g.nSteps, err}
+	}
+
+	g.nSteps++
+	return nil
+}
+
+func newGame() *game {
+	p := newPlayer()
+	things := map[label]int{
+		apple.name:    2,
+		coin.name:     3,
+		mirror.name:   1,
+		mushroom.name: 1,
+	}
+	return &game{p, things, 0}
+}
+
+func giveAdvice(err error) string {
+	return fmt.Sprintf("%s", err)
+}
+
+func playGame() {
+	gm := newGame()
+	steps := []step{
+		{eat, apple},
+		{eat, apple},
+		{eat, mushroom},
+	}
+
+	for _, st := range steps {
+		if err := tryStep(gm, st); err != nil {
+			fmt.Println(err)
+			giveAdvice(err)
+			os.Exit(1)
+		}
+	}
+	fmt.Println("You win!")
+}
+
+func tryStep(gm *game, st step) error {
+	fmt.Printf("trying to %s %s... ", st.cmd, st.obj.name)
+	if err := gm.execute(st); err != nil {
+		fmt.Println("FAIL")
+		return err
+	}
+	fmt.Println("OK")
+	return nil
+}
+
 func main() {
 	printTime()
 	euclid()
@@ -287,4 +509,5 @@ func main() {
 	fmt.Println(tour)
 	validatePassword()
 	getMax()
+	playGame()
 }
