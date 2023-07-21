@@ -7,9 +7,7 @@ import (
 )
 
 func wordCount(input string) int {
-	// Split the input string into words using spaces as separators
 	words := strings.Fields(input)
-	// Return the count of words
 	return len(words)
 }
 
