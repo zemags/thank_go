@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// JoinWords combines words from two strings, removes duplicates
-// and returns resulting words in sorted order.
 func JoinWords(first, second string) []string {
 	words1 := split(first)
 	words2 := split(second)
@@ -17,12 +15,10 @@ func JoinWords(first, second string) []string {
 	return words
 }
 
-// split splits string into words.
 func split(str string) []string {
 	return strings.Fields(str)
 }
 
-// join joines two word slices into single slice.
 func join(words1, words2 []string) []string {
 	words := make([]string, len(words1)+len(words2))
 	idx := 0
@@ -37,7 +33,6 @@ func join(words1, words2 []string) []string {
 	return words
 }
 
-// lower converts all words to lower case.
 func lower(words []string) []string {
 	for idx, word := range words {
 		words[idx] = strings.ToLower(word)
@@ -45,13 +40,11 @@ func lower(words []string) []string {
 	return words
 }
 
-// sorted sorts all words alphabetically.
 func sorted(words []string) []string {
 	sort.Strings(words)
 	return words
 }
 
-// uniq removes duplicate words.
 func uniq(words []string) []string {
 	uniq := []string{}
 	current := ""
